@@ -102,16 +102,13 @@ generate_report_plots <- function() {
 
     # Copy RR plot to report directory
     combined_plots_dir <- get_output_dir("rr_with_overall")
-    file.copy(
-        from = file.path(combined_plots_dir, "combined_risk_ratio_with_overall.png"),
-        to = file.path(output_dir, "5_relative_risk_plot.png"),
-        overwrite = TRUE
-    )
-    file.copy(
-        from = file.path(combined_plots_dir, "combined_risk_ratio_with_overall.pdf"),
-        to = file.path(output_dir, "5_relative_risk_plot.pdf"),
-        overwrite = TRUE
-    )
+    for (fmt in c("png", "pdf", "tif", "eps")) {
+        file.copy(
+            from = file.path(combined_plots_dir, paste0("combined_risk_ratio_with_overall.", fmt)),
+            to = file.path(output_dir, paste0("5_relative_risk_plot.", fmt)),
+            overwrite = TRUE
+        )
+    }
 
     # 2. Generate infection share plot using consolidated function
     message("2. Generating Infection Share plot...")
@@ -235,7 +232,7 @@ generate_univariable_plots <- function() {
                     "Ethnicity"               = set2[2],
                     "NS-SeC"                  = set2[3],
                     "Gender"                  = set2[4],
-                    "NS-SeC \u00d7 Ethnicity" = set2[5]
+                    "NS-SeC and Ethnicity" = set2[5]
                 )
 
                 p <- ggplot(plot_data, aes(x = .data[[config$var]], y = RelativeBurden_mean)) +

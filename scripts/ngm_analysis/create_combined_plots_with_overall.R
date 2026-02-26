@@ -255,7 +255,7 @@ if (length(combined_rr_overall_plots) > 0) {
         top_row <- wrap_plots(p_age_eth, p_age_gender_no_y,
             nrow = 1,
             widths = c(age_eth_facets, age_gender_facets)
-        ) + plot_layout(guides = "collect")
+        )
 
         # Create custom vertical layout
         combined_rr_overall_vertical <- wrap_plots(
@@ -302,6 +302,7 @@ if (length(combined_rr_overall_plots) > 0) {
             combined_grid,
             file.path(MAIN_OUTPUT_DIR, "combined_risk_ratio_with_overall_2x2"),
             width = 20, height = 13,
+            formats = c("png", "pdf", "tif", "eps"),
             message_text = "Saved 2x2 Grid Layout RR plot with Overall to:"
         )
     }
@@ -324,6 +325,7 @@ if (length(combined_rr_overall_plots) > 0) {
         combined_rr_overall_horizontal,
         file.path(MAIN_OUTPUT_DIR, "combined_risk_ratio_with_overall_wide"),
         width = 36, height = 8,
+        formats = c("png", "pdf", "tif", "eps"),
         message_text = "Saved WIDE combined RR plot with Overall category to:"
     )
 }

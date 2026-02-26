@@ -210,7 +210,11 @@ create_demographic_plot <- function(data_dt,
     fill_label <- if (!is.null(facet_var)) {
         if ((x_var == "SES" && facet_var == "Ethnicity") ||
             (x_var == "Ethnicity" && facet_var == "SES")) {
-            "NS-SeC \u00d7 Ethnicity"
+            "NS-SeC and Ethnicity"
+        } else if (x_var == "Age" && facet_var == "SES") {
+            "Age and NS-SeC"
+        } else if (x_var == "Age") {
+            paste0("Age and ", tools::toTitleCase(facet_var))
         } else if (facet_var == "SES") {
             "NS-SeC"
         } else {
@@ -224,11 +228,11 @@ create_demographic_plot <- function(data_dt,
     # can merge all fill/colour guides into a single legend.
     set2 <- RColorBrewer::brewer.pal(8, "Set2")
     shared_values <- c(
-        "Age"                     = set2[1],
-        "Ethnicity"               = set2[2],
-        "NS-SeC"                  = set2[3],
-        "Gender"                  = set2[4],
-        "NS-SeC \u00d7 Ethnicity" = set2[5]
+        "Age" = set2[1],
+        "Age and Ethnicity" = set2[2],
+        "Age and NS-SeC" = set2[3],
+        "Age and Gender" = set2[4],
+        "NS-SeC and Ethnicity" = set2[5]
     )
 
     # Add geom based on plot type
@@ -609,8 +613,12 @@ create_combined_rr_with_overall <- function(stratified_data, univariable_data, f
     # Derive the same single-label colour scheme used by create_demographic_plot
     # so the legend entry matches across all plot types.
     fill_label <- if ((x_var == "SES" && facet_var == "Ethnicity") ||
-                      (x_var == "Ethnicity" && facet_var == "SES")) {
-        "NS-SeC \u00d7 Ethnicity"
+        (x_var == "Ethnicity" && facet_var == "SES")) {
+        "NS-SeC and Ethnicity"
+    } else if (x_var == "Age" && facet_var == "SES") {
+        "Age and NS-SeC"
+    } else if (x_var == "Age") {
+        paste0("Age and ", tools::toTitleCase(facet_var))
     } else if (facet_var == "SES") {
         "NS-SeC"
     } else {
@@ -619,11 +627,11 @@ create_combined_rr_with_overall <- function(stratified_data, univariable_data, f
 
     set2_colors <- RColorBrewer::brewer.pal(8, "Set2")
     shared_values <- c(
-        "Age"                     = set2_colors[1],
-        "Ethnicity"               = set2_colors[2],
-        "NS-SeC"                  = set2_colors[3],
-        "Gender"                  = set2_colors[4],
-        "NS-SeC \u00d7 Ethnicity" = set2_colors[5]
+        "Age"                 = set2_colors[1],
+        "Age and Ethnicity"   = set2_colors[2],
+        "Age and NS-SeC"      = set2_colors[3],
+        "Age and Gender"      = set2_colors[4],
+        "NS-SeC and Ethnicity" = set2_colors[5]
     )
 
     # Ribbon colour matches the fill_label colour
@@ -739,7 +747,7 @@ get_analysis_configs <- function(analysis_type = "stratified") {
                 filter_func = filter_gender_data
             ),
             list(
-                name = "Eth_SES_Stratified", facet_var = "Ethnicity", title = "D) By Ethnicity & NS-SeC",
+                name = "Eth_SES_Stratified", facet_var = "Ethnicity", title = "D) By NS-SeC & Ethnicity",
                 x_var = "SES", labels = get_ses_labels(), filter_func = filter_eth_ses_data
             )
         )
