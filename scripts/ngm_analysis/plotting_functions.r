@@ -16,6 +16,47 @@ globalVariables(c(
     "Ethnicity"
 ))
 
+# --- Standardized plot saving function ---
+#' Save plot in multiple formats (PNG, PDF, TIF, EPS)
+#' @param plot The ggplot or patchwork plot object
+#' @param filename_base Base filename without extension
+#' @param width Plot width in inches
+#' @param height Plot height in inches
+#' @param dpi Resolution for raster formats (default 300)
+#' @param formats Character vector of formats to save ("png", "pdf", "tif", "eps")
+#' @param message_text Optional message to display
+save_plot_files <- function(plot, filename_base, width = 10, height = 7, dpi = 300,
+                            formats = c("png", "pdf"), message_text = "Saved plot to:") {
+    for (fmt in formats) {
+        filename <- paste0(filename_base, ".", fmt)
+
+        if (fmt == "png") {
+            ggsave(filename,
+                plot = plot, width = width, height = height,
+                dpi = dpi, bg = "white", limitsize = FALSE
+            )
+        } else if (fmt == "pdf") {
+            ggsave(filename,
+                plot = plot, width = width, height = height,
+                dpi = dpi, bg = "white", limitsize = FALSE
+            )
+        } else if (fmt == "tif" || fmt == "tiff") {
+            ggsave(filename,
+                plot = plot, width = width, height = height,
+                dpi = dpi, device = "tiff", compression = "lzw",
+                bg = "white", limitsize = FALSE
+            )
+        } else if (fmt == "eps") {
+            ggsave(filename,
+                plot = plot, width = width, height = height,
+                device = cairo_ps, bg = "white", limitsize = FALSE
+            )
+        }
+    }
+
+    message(paste(message_text, paste0(filename_base, ".{", paste(formats, collapse = ","), "}")))
+}
+
 # --- Common plot elements (defined once) ---
 RIBBON_CAPTION_TEXT <- "Coloured ribbons shows univariable (overall) result"
 
@@ -71,7 +112,9 @@ get_common_theme <- function() {
             axis.line = element_line(colour = "black", linewidth = 0.5),
             axis.ticks = element_line(colour = "black", linewidth = 0.5),
             axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
-            legend.position = "none",
+            legend.position = "bottom",
+            legend.box = "horizontal",
+            legend.margin = margin(t = 0, b = 0),
             strip.text = element_text(face = "bold", size = 11),
             strip.background = element_blank()
         )
@@ -159,16 +202,39 @@ create_demographic_plot <- function(data_dt,
     # Basic plot setup
     p <- ggplot(data_dt, aes(x = .data[[x_var]], y = .data[[value_col]]))
 
-    # Get demographic-specific color palette
-    # Use facet_var for color palette selection if available, otherwise use x_var
-    palette_var <- if (!is.null(facet_var)) facet_var else x_var
-    x_levels <- unique(data_dt[[x_var]])
-    color_palette <- get_demographic_palette(palette_var, x_levels)
+    # Derive a single descriptive label for this plot's aesthetic.
+    # Mapping fill/colour to a CONSTANT string (not a data column) gives exactly
+    # one legend entry per subplot with no sub-categories.  Using the same shared
+    # scale_fill/color_manual across every subplot lets patchwork
+    # collect all entries into one clean legend.
+    fill_label <- if (!is.null(facet_var)) {
+        if ((x_var == "SES" && facet_var == "Ethnicity") ||
+            (x_var == "Ethnicity" && facet_var == "SES")) {
+            "NS-SeC \u00d7 Ethnicity"
+        } else if (facet_var == "SES") {
+            "NS-SeC"
+        } else {
+            tools::toTitleCase(facet_var)
+        }
+    } else {
+        if (x_var == "SES") "NS-SeC" else tools::toTitleCase(x_var)
+    }
+
+    # Shared colour map — identical definition in every subplot so patchwork
+    # can merge all fill/colour guides into a single legend.
+    set2 <- RColorBrewer::brewer.pal(8, "Set2")
+    shared_values <- c(
+        "Age"                     = set2[1],
+        "Ethnicity"               = set2[2],
+        "NS-SeC"                  = set2[3],
+        "Gender"                  = set2[4],
+        "NS-SeC \u00d7 Ethnicity" = set2[5]
+    )
 
     # Add geom based on plot type
     if (plot_type == "bars") {
-        p <- p + geom_col(aes(fill = .data[[x_var]]), alpha = 0.8, show.legend = FALSE) +
-            scale_fill_manual(values = color_palette)
+        p <- p + geom_col(aes(fill = fill_label), alpha = 0.8) +
+            scale_fill_manual(values = shared_values, name = NULL)
         if (!is.null(ci_lower_col) && !is.null(ci_upper_col)) {
             p <- p + geom_errorbar(aes(ymin = .data[[ci_lower_col]], ymax = .data[[ci_upper_col]]),
                 width = 0.25, color = "gray30"
@@ -179,14 +245,14 @@ create_demographic_plot <- function(data_dt,
             p <- p + geom_pointrange(
                 aes(
                     ymin = .data[[ci_lower_col]], ymax = .data[[ci_upper_col]],
-                    color = .data[[x_var]]
+                    color = fill_label
                 ),
-                size = 0.8, show.legend = FALSE
+                size = 0.8
             ) +
-                scale_color_manual(values = color_palette)
+                scale_color_manual(values = shared_values, name = NULL)
         } else {
-            p <- p + geom_point(aes(color = .data[[x_var]]), size = 2, show.legend = FALSE) +
-                scale_color_manual(values = color_palette)
+            p <- p + geom_point(aes(color = fill_label), size = 2) +
+                scale_color_manual(values = shared_values, name = NULL)
         }
     }
 
@@ -202,10 +268,13 @@ create_demographic_plot <- function(data_dt,
         }
     }
 
-    # Add labels and theme
     p <- p +
-        labs(title = plot_title, x = NULL, y = y_label) +
-        common_theme
+        labs(title = plot_title, x = NULL, y = y_label, fill = NULL, colour = NULL) +
+        common_theme +
+        guides(
+            fill = guide_legend(title = NULL, nrow = 1),
+            colour = guide_legend(title = NULL, nrow = 1)
+        )
 
     # Add log scale if needed
     if (use_log_scale) {
@@ -222,22 +291,6 @@ create_demographic_plot <- function(data_dt,
     }
 
     return(p)
-}
-
-# --- Function to save plots consistently ---
-save_plot_files <- function(plot, filename_base, width = 12, height = 10, message_text = "") {
-    ggsave(paste0(filename_base, ".png"),
-        plot = plot, width = width, height = height,
-        dpi = 600, bg = "white", limitsize = FALSE
-    )
-    ggsave(paste0(filename_base, ".pdf"),
-        plot = plot, width = width, height = height,
-        dpi = 600, bg = "white", limitsize = FALSE
-    )
-
-    if (message_text != "") {
-        message(paste(message_text, filename_base))
-    }
 }
 
 # --- Function to filter SES data consistently ---
@@ -432,13 +485,13 @@ generate_stratified_ngm_plots <- function(data_dt,
                     ymin = .data[[lower_ci_col]], ymax = .data[[upper_ci_col]],
                     color = .data[[x_var]]
                 ),
-                size = 0.8, show.legend = FALSE
+                size = 0.8
             ) +
             scale_color_manual(values = color_palette_full)
     } else {
         # Use bars for absolute measures (transmission contribution, case share, etc.)
         p_full_dist <- ggplot(plot_data_full, aes(x = .data[[x_var]], y = .data[[value_col]])) +
-            geom_col(aes(fill = .data[[x_var]]), alpha = 0.8, show.legend = FALSE) +
+            geom_col(aes(fill = .data[[x_var]]), alpha = 0.8) +
             scale_fill_manual(values = color_palette_full)
 
         if (add_cis) {
@@ -473,8 +526,11 @@ generate_stratified_ngm_plots <- function(data_dt,
         ) +
         common_theme +
         theme(
-            axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
-            legend.position = "none"
+            axis.text.x = element_text(angle = 45, hjust = 1, size = 9)
+        ) +
+        guides(
+            fill = guide_legend(title = tools::toTitleCase(x_var), nrow = 1),
+            colour = guide_legend(title = tools::toTitleCase(x_var), nrow = 1)
         )
 
     if (use_log_value_axis) {
@@ -550,35 +606,29 @@ create_combined_rr_with_overall <- function(stratified_data, univariable_data, f
         ribbon_data <- rbindlist(ribbon_data_list, fill = TRUE)
     }
 
-    # Get color palette for stratified data
-    # Special case for NS-SeC x Ethnicity analysis (use green instead of blue)
-    if (x_var == "SES" && facet_var == "Ethnicity") {
-        set2_colors_temp <- RColorBrewer::brewer.pal(8, "Set2")
-        x_levels_temp <- unique(stratified_data[[x_var]])
-        color_palette <- rep(set2_colors_temp[5], length(x_levels_temp)) # Use green
-        names(color_palette) <- x_levels_temp
+    # Derive the same single-label colour scheme used by create_demographic_plot
+    # so the legend entry matches across all plot types.
+    fill_label <- if ((x_var == "SES" && facet_var == "Ethnicity") ||
+                      (x_var == "Ethnicity" && facet_var == "SES")) {
+        "NS-SeC \u00d7 Ethnicity"
+    } else if (facet_var == "SES") {
+        "NS-SeC"
     } else {
-        color_palette <- get_demographic_palette(facet_var, unique(stratified_data[[x_var]]))
+        tools::toTitleCase(facet_var)
     }
 
-    # Get the demographic color for the ribbon
     set2_colors <- RColorBrewer::brewer.pal(8, "Set2")
-    color_map <- list(
-        "Age" = set2_colors[1],
-        "Ethnicity" = set2_colors[2],
-        "SES" = set2_colors[3],
-        "Gender" = set2_colors[4]
+    shared_values <- c(
+        "Age"                     = set2_colors[1],
+        "Ethnicity"               = set2_colors[2],
+        "NS-SeC"                  = set2_colors[3],
+        "Gender"                  = set2_colors[4],
+        "NS-SeC \u00d7 Ethnicity" = set2_colors[5]
     )
 
-    # Special case for NS-SeC x Ethnicity analysis (different color)
-    if (x_var == "SES" && facet_var == "Ethnicity") {
-        ribbon_color <- set2_colors[5] # Use 5th color (green) from Set2 for SES x Eth
-    } else {
-        ribbon_color <- color_map[[facet_var]]
-        if (is.null(ribbon_color)) {
-            ribbon_color <- set2_colors[1]
-        }
-    }
+    # Ribbon colour matches the fill_label colour
+    ribbon_color <- shared_values[[fill_label]]
+    if (is.null(ribbon_color)) ribbon_color <- set2_colors[1]
 
     # Create the plot
     p <- ggplot(stratified_data, aes(x = .data[[x_var]], y = RelativeBurden_mean)) +
@@ -602,17 +652,16 @@ create_combined_rr_with_overall <- function(stratified_data, univariable_data, f
             )
     }
 
-    # Add stratified points
     p <- p +
         geom_pointrange(
             aes(
                 ymin = RelativeBurden_lowerCI,
                 ymax = RelativeBurden_upperCI,
-                color = .data[[x_var]]
+                color = fill_label
             ),
-            size = 0.8, show.legend = FALSE
+            size = 0.8
         ) +
-        scale_color_manual(values = color_palette) +
+        scale_color_manual(values = shared_values, name = NULL) +
         {
             if (!is.null(facet_labels)) {
                 facet_wrap(vars(.data[[facet_var]]),
@@ -627,13 +676,15 @@ create_combined_rr_with_overall <- function(stratified_data, univariable_data, f
             title = title_text,
             subtitle = subtitle_text,
             x = if (x_var == "SES") "NS-SeC" else tools::toTitleCase(x_var),
-            y = "Relative Risk of Infection (vs Reference)"
+            y = "Relative Risk of Infection (vs Reference)",
+            colour = NULL
         ) +
         get_common_theme() +
         get_log_y_scale() +
         theme(
             axis.text.x = element_text(angle = 45, hjust = 1, size = 9)
-        )
+        ) +
+        guides(colour = guide_legend(title = NULL, nrow = 1))
 
     # Add x-axis labels if provided
     if (!is.null(x_axis_labels)) {
@@ -812,7 +863,9 @@ create_report_layout <- function(plots, facet_counts = NULL) {
         plots$age_ses, # Row 2: Age & NS-SeC
         plots$eth_ses, # Row 3: Ethnicity & NS-SeC
         ncol = 1
-    ) + plot_layout(guides = "collect")
+    ) +
+        plot_layout(guides = "collect") &
+        theme(legend.position = "bottom", legend.direction = "horizontal")
 
     return(combined_plot)
 }
@@ -923,15 +976,7 @@ generate_infection_share_plots <- function(cache_dir, output_dir, analysis_confi
                 # Determine variables
                 x_variable <- config$x_var %||% "Age"
 
-                # Get consistent colors
-                color_palette <- get_consistent_plot_colors(
-                    x_variable = x_variable,
-                    facet_var = config$facet_var,
-                    config = config,
-                    x_levels = unique(plot_data[[x_variable]])
-                )
-
-                # Create plot with consistent colors applied directly
+                # create_demographic_plot handles color/legend internally now
                 p <- create_demographic_plot(
                     data_dt = plot_data,
                     value_col = "ProjectedCaseShare_mean",
@@ -944,9 +989,6 @@ generate_infection_share_plots <- function(cache_dir, output_dir, analysis_confi
                     plot_type = "bars",
                     facet_labels = config$facet_labels
                 )
-
-                # Override with consistent colors (replace the scale)
-                p <- p + scale_fill_manual(values = color_palette)
 
                 # Add x-axis labels if specified
                 if (!is.null(config$labels) && x_variable == "SES") {
@@ -991,11 +1033,13 @@ generate_infection_share_report <- function(cache_dir, output_dir, filename_base
         # Create report layout
         combined_plot <- create_report_layout(plots, facet_counts)
 
-        # Save files
+        # Save files in high-res formats
         save_plot_files(
             combined_plot,
             file.path(output_dir, filename_base),
             width = 20, height = 21,
+            dpi = 300,
+            formats = c("png", "pdf", "tif", "eps"),
             message_text = "Saved combined Projected Share of Infections plot to:"
         )
 

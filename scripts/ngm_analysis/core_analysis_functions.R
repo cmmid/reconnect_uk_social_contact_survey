@@ -1823,10 +1823,10 @@ calculate_ngm_stratified <- function(mean_contact_array,
         stop(paste0("Contact array dimensions (", paste(dim(mean_contact_array), collapse = "x"), ") do not match 2 * number of stratification variables (", 2 * num_strat_vars, ")."))
     }
 
-    # The transposition of the contact matrix (C_ij -> C_ji) is not strictly necessary
-    # when susceptibility and transmissibility are assumed to be uniform across strata,
-    # as the leading eigenvector remains the same. The NGM K is directly proportional to C.
-    # We will therefore use the contact array directly without transposition.
+    # Transpose for correct NGM orientation (K_ij = transmission FROM j TO i)
+    # Contact matrix C_ij is contacts of i with j.
+    # Transmission from j to i depends on j contacting i, which is C_ji.
+    # Thus K is proportional to t(C).
     contact_matrix_for_ngm <- mean_contact_array
     contact_matrix_for_ngm[is.na(contact_matrix_for_ngm)] <- 0
 

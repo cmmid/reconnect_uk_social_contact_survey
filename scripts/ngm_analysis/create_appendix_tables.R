@@ -245,7 +245,8 @@ readme_content <- data.frame(
         "- Age x Ethnicity",
         "- Age x NS-SeC",
         "- Age x Gender",
-        "- Ethnicity x NS-SeC"
+        "- Ethnicity x NS-SeC",
+        "- Contact Matrices (if available)"
     ),
     Description = c(
         "UK Contact Survey stratified next-generation matrix analysis",
@@ -260,10 +261,59 @@ readme_content <- data.frame(
         "Two-way analysis: Age (5-year bands) × Ethnicity",
         "Two-way analysis: Age (5-year bands) × NS-SeC",
         "Two-way analysis: Age (5-year bands) × Gender",
-        "Two-way analysis: Ethnicity × NS-SeC (no age stratification)"
+        "Two-way analysis: Ethnicity × NS-SeC (no age stratification)",
+        "Raw contact matrices (mixing patterns) for each stratified analysis"
     )
 )
 writeData(wb, "README", readme_content)
+
+# --- Export mixing pattern tables (contact matrices) ---
+# Load cached results to get raw contact matrix data
+cat("\n=== EXPORTING MIXING PATTERN TABLES ===\n")
+cache_dir <- here::here("cache", "stratified_ngm_cache")
+
+all_analyses <- c(oneway_analyses, twoway_analyses)
+mixing_pattern_list <- list()
+
+for (analysis_name in all_analyses) {
+    cache_file <- file.path(cache_dir, analysis_name, paste0(analysis_name, "_consolidated_results.qs"))
+
+    if (file.exists(cache_file)) {
+        cat(paste("  Loading contact matrix for:", analysis_name, "\n"))
+        cached_result <- tryCatch(qs::qread(cache_file), error = function(e) NULL)
+
+        if (!is.null(cached_result) && !is.null(cached_result$mean_contact_matrix_flat_summary_dt)) {
+            matrix_dt <- copy(cached_result$mean_contact_matrix_flat_summary_dt)
+
+            # Rename columns for clarity
+            if (nrow(matrix_dt) > 0) {
+                # Add analysis name column
+                matrix_dt[, Analysis := analysis_name]
+
+                # Add to list for combined export
+                mixing_pattern_list[[analysis_name]] <- matrix_dt
+
+                # Create sheet name for this analysis
+                sheet_name <- paste0("Matrix ", gsub("_Stratified.*", "", analysis_name))
+                sheet_name <- gsub("_", " ", sheet_name)
+                sheet_name <- substr(sheet_name, 1, 31) # Excel sheet name limit
+
+                # Add sheet to workbook
+                addWorksheet(wb, sheet_name)
+                writeData(wb, sheet_name, matrix_dt)
+                cat(paste("    Added mixing pattern table:", sheet_name, "\n"))
+            }
+        }
+    }
+}
+
+# Also save all mixing patterns as a single CSV file
+if (length(mixing_pattern_list) > 0) {
+    all_mixing_patterns <- rbindlist(mixing_pattern_list, fill = TRUE)
+    mixing_csv_path <- here::here("results", "mixing_pattern_tables.csv")
+    fwrite(all_mixing_patterns, mixing_csv_path)
+    cat(paste("\nMixing pattern tables saved to:", mixing_csv_path, "\n"))
+}
 
 # Save Excel file
 excel_output_path <- here::here("results", "stratified_ngm_analysis_results.xlsx")

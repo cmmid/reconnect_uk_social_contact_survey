@@ -334,111 +334,117 @@ fcn_impute <- function(
 fcn_impute_raw_counts <- function(
     data_input, # dataset which needs filling in, e.g. raw_counts
     var, # name of variable which is being imputed (c_ethnicity or c_sec_input)
-    dependent_vars = NULL # names of columns to create a dependent distribution 
-){
-  
+    dependent_vars = NULL # names of columns to create a dependent distribution
+    ) {
   data_in <- copy(data.table(data_input))
-  
+
   generalised_var <- gsub("^p_", "", gsub("^c_", "", var))
-  
+
   # check set up for var
-  if(generalised_var %notin% c('ethnicity', 'sec_input')){stop('Not set up for this var')}
-  
+  if (generalised_var %notin% c("ethnicity", "sec_input")) {
+    stop("Not set up for this var")
+  }
+
   # define column to be distributed elsewhere
-  if(generalised_var == 'ethnicity'){key_col <- 'cag_Prefer not to say'}
-  if(generalised_var == 'sec_input'){key_col <- 'cag_Unknown'}
-  
+  if (generalised_var == "ethnicity") {
+    key_col <- "cag_Prefer not to say"
+  }
+  if (generalised_var == "sec_input") {
+    key_col <- "cag_Unknown"
+  }
+
   # if no NAs, end
-  if(sum(data_in[,get(key_col)]) == 0){
-    cat('0 changes made')
+  if (sum(data_in[, get(key_col)]) == 0) {
+    cat("0 changes made")
     return(data_in)
-  }else{
-    n_changes <- sum(data_in[,get(key_col)]) 
+  } else {
+    n_changes <- sum(data_in[, get(key_col)])
     rows_to_change <- data_in[get(key_col) > 0, row_id]
   }
-  
+
   grouping_vars <- c(var, dependent_vars)
-  
+
   # how is the variable of interest distributed in the non-NA data?
-  distribution_var_vec <- c(dependent_vars, colnames(data_in)[grepl('cag', colnames(data_in))])
+  distribution_var_vec <- c(dependent_vars, colnames(data_in)[grepl("cag", colnames(data_in))])
   distribution_var_vec <- distribution_var_vec[!distribution_var_vec == key_col]
   data_distr <- data_in[, ..distribution_var_vec][, lapply(.SD, mean), by = dependent_vars]
   data_distr[, tot := rowSums(data_distr[, 2:ncol(data_distr)])]
-  data_distr_l <- melt.data.table(data_distr, id.vars = c(dependent_vars, 'tot'))[, prop := value/tot]
-  
-  if(length(dependent_vars) == 0){
-    
+  data_distr_l <- melt.data.table(data_distr, id.vars = c(dependent_vars, "tot"))[, prop := value / tot]
+
+  if (length(dependent_vars) == 0) {
     vars_to_replace <- data_distr_l$variable
     var_col_nums <- which(colnames(data_in) %in% vars_to_replace)
     key_col_num <- which(colnames(data_in) == key_col)
     all_cols <- c(var_col_nums, key_col_num)
-    
-    for(i_row in rows_to_change){
-      
+
+    for (i_row in rows_to_change) {
       n_not_imputing <- sum(data_in[i_row, ..vars_to_replace])
       n_to_impute <- data_in[i_row, get(key_col)]
-      samples <- table(sample(x = data_distr_l$variable, 
-                        size = n_to_impute,
-                        prob = data_distr_l$prop,
-                        replace = T))
-      
+      samples <- table(sample(
+        x = data_distr_l$variable,
+        size = n_to_impute,
+        prob = data_distr_l$prop,
+        replace = T
+      ))
+
       # add the imputed observations
-      for(col_name in vars_to_replace){
+      for (col_name in vars_to_replace) {
         col_num <- which(colnames(data_in) == col_name)
         data_in[i_row, col_num] <- data_in[i_row, ..col_num] + unname(samples[names(samples) == col_name])
       }
       # remove the original imputed observations
       data_in[i_row, key_col_num] <- 0
-      
+
       # check the number of observations is correct
-      if(sum(data_in[i_row, ..all_cols]) != n_not_imputing + n_to_impute){warning(paste0("Number of observations doesn't add up (i_row = ", i_row))}
-      
+      if (sum(data_in[i_row, ..all_cols]) != n_not_imputing + n_to_impute) {
+        warning(paste0("Number of observations doesn't add up (i_row = ", i_row))
+      }
     }
-  }else{
-    
+  } else {
     vars_to_replace <- unique(data_distr_l$variable)
     var_col_nums <- which(colnames(data_in) %in% vars_to_replace)
     key_col_num <- which(colnames(data_in) == key_col)
     all_cols <- c(var_col_nums, key_col_num)
-    
-    for(i_row in rows_to_change){
-      
+
+    for (i_row in rows_to_change) {
       # filter data_distr_l to apply to participant
       data_distr_l_filt <- copy(data_distr_l)
-      for(dep_var in dependent_vars){
+      for (dep_var in dependent_vars) {
         filter <- data_in[i_row, get(dep_var)]
         data_distr_l_filt <- data_distr_l_filt[get(dep_var) == filter]
       }
-      
+
       n_not_imputing <- sum(data_in[i_row, ..vars_to_replace])
       n_to_impute <- data_in[i_row, get(key_col)]
-      samples <- table(sample(x = data_distr_l_filt$variable, 
-                              size = n_to_impute,
-                              prob = data_distr_l_filt$prop,
-                              replace = T))
-      
+      samples <- table(sample(
+        x = data_distr_l_filt$variable,
+        size = n_to_impute,
+        prob = data_distr_l_filt$prop,
+        replace = T
+      ))
+
       # add the imputed observations
-      for(col_name in vars_to_replace){
+      for (col_name in vars_to_replace) {
         col_num <- which(colnames(data_in) == col_name)
         data_in[i_row, col_num] <- data_in[i_row, ..col_num] + unname(samples[names(samples) == col_name])
       }
       # remove the original imputed observations
       data_in[i_row, key_col_num] <- 0
-      
+
       # check the number of observations is correct
-      if(sum(data_in[i_row, ..all_cols]) != n_not_imputing + n_to_impute){warning(cat("Number of observations doesn't add up (i_row = ", i_row, sep = ''))}
-      
+      if (sum(data_in[i_row, ..all_cols]) != n_not_imputing + n_to_impute) {
+        warning(cat("Number of observations doesn't add up (i_row = ", i_row, sep = ""))
+      }
     }
   }
-  
+
   # check no NAs remaining
-  if(sum(data_in[,get(key_col)]) > 0){
+  if (sum(data_in[, get(key_col)]) > 0) {
     warning(paste0("Still some observations left in ", key_col))
   }
-  
+
   # cat(length(rows_to_change), ' changes made to ', var, ' (', n_changes, ' total changes)\n', sep = '')
   return(data_in)
-  
 }
 
 
@@ -2166,7 +2172,7 @@ plot_contact_matrix <- function(data, location_type, participant_var, contact_va
   if (uncertainty == F) {
     ggplot(data = filtered_data, mapping = aes(x = !!sym(participant_var), y = !!sym(contact_var), fill = n_contacts)) +
       geom_tile() +
-      geom_text(mapping = aes(label = sprintf("%.2f", n_contacts)), color = "white", size = 2) +
+      geom_text(mapping = aes(label = sprintf("%.1f", n_contacts)), color = "white", size = 3) +
       scale_fill_viridis_c(
         name = (paste0("Mean daily contacts")),
         trans = "pseudo_log", option = "D"
@@ -2182,7 +2188,7 @@ plot_contact_matrix <- function(data, location_type, participant_var, contact_va
   } else {
     ggplot(data = filtered_data, mapping = aes(x = !!sym(participant_var), y = !!sym(contact_var), fill = ci_u - ci_l)) +
       geom_tile() +
-      geom_text(mapping = aes(label = paste0("(", round(ci_l, 2), ", ", round(ci_u, 2), ")")), color = "white", size = 2) +
+      geom_text(mapping = aes(label = paste0("(", round(ci_l, 1), ", ", round(ci_u, 1), ")")), color = "white", size = 3) +
       scale_fill_viridis_c(
         name = (paste0("Width of 95% confidence interval")),
         trans = "pseudo_log", option = "A"

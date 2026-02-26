@@ -142,16 +142,16 @@ polymod_weights <- function(
       } else {
         col <- age_to_pm_lab(pmw[i, c_age_group])
         # scale 15-19 value by 60% if broad age group is 0-17
-        if(pmw[i, broad_age_group] == '0-17' & any(names(subset_row) == "[15,20)")){
-          subset_row[, '[15,20)'] <- 0.6*subset_row[, '[15,20)']
-          suppressWarnings(pmw[i, prob := subset_row[,..col]/rowSums(subset_row)])
-        }else{
+        if (pmw[i, broad_age_group] == "0-17" & any(names(subset_row) == "[15,20)")) {
+          subset_row[, "[15,20)"] <- 0.6 * subset_row[, "[15,20)"]
+          suppressWarnings(pmw[i, prob := subset_row[, ..col] / rowSums(subset_row)])
+        } else {
           # scale 15-19 value by 40% if broad age group is 18-64
-          if(pmw[i, broad_age_group] == '18-64' & any(names(subset_row) == "[15,20)")){
-            subset_row[, '[15,20)'] <- 0.4*subset_row[, '[15,20)']
-            suppressWarnings(pmw[i, prob := subset_row[,..col]/rowSums(subset_row)])
-          }else{
-            suppressWarnings(pmw[i, prob := subset_row[,..col]/rowSums(subset_row)])
+          if (pmw[i, broad_age_group] == "18-64" & any(names(subset_row) == "[15,20)")) {
+            subset_row[, "[15,20)"] <- 0.4 * subset_row[, "[15,20)"]
+            suppressWarnings(pmw[i, prob := subset_row[, ..col] / rowSums(subset_row)])
+          } else {
+            suppressWarnings(pmw[i, prob := subset_row[, ..col] / rowSums(subset_row)])
           }
         }
       }
@@ -256,8 +256,8 @@ raw_counts <- function(
     filter(p_id %notin% cont_in$p_id) %>%
     select(!!!syms(select_vars))
   names <- colnames(add_data)
-  for(var in contact_var){
-    add_data <- add_data %>% mutate(var = unname(unlist(cont_in[1,var])))
+  for (var in contact_var) {
+    add_data <- add_data %>% mutate(var = unname(unlist(cont_in[1, var])))
     colnames(add_data) <- c(names, var)
     names <- colnames(add_data)
   }
@@ -1247,8 +1247,8 @@ plot_mu_matrix <- function(matrix_data,
       geom_tile(aes(x = p_var, y = c_var, fill = mean)) +
       geom_text(aes(
         x = p_var, y = c_var,
-        label = sprintf("%.2f", mean)
-      ), color = "white", size = 2) +
+        label = sprintf("%.1f", mean)
+      ), color = "white", size = 3) +
       scale_fill_viridis_c(
         name = ifelse(variable == "mu", "Mean of negative\nbinomial distribution",
           "Size of negative\nbinomial distribution"
@@ -1274,8 +1274,8 @@ plot_mu_matrix <- function(matrix_data,
       geom_tile(aes(x = p_var, y = c_var, fill = width)) +
       geom_text(aes(
         x = p_var, y = c_var,
-        label = sprintf("%.2f", width)
-      ), color = "white", size = 2) +
+        label = sprintf("%.1f", width)
+      ), color = "white", size = 3) +
       scale_fill_viridis_c(
         name = ifelse(variable == "mu", "Width of\nconfidence interval (mean)",
           "Width of\nconfidence interval (size)"

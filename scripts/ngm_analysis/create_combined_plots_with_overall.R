@@ -265,7 +265,8 @@ if (length(combined_rr_overall_plots) > 0) {
             ncol = 1
         ) +
             plot_layout(guides = "collect") +
-            add_caption_annotation()
+            add_caption_annotation() &
+            theme(legend.position = "bottom", legend.direction = "horizontal")
     } else {
         # Fallback to simple vertical layout if fewer than 4 plots
         combined_rr_overall_vertical <- create_combined_plot(
@@ -279,6 +280,8 @@ if (length(combined_rr_overall_plots) > 0) {
         combined_rr_overall_vertical,
         file.path(MAIN_OUTPUT_DIR, "combined_risk_ratio_with_overall"),
         width = 20, height = 21,
+        dpi = 300,
+        formats = c("png", "pdf", "tif", "eps"),
         message_text = "Saved combined RR plot with Overall category to:"
     )
 

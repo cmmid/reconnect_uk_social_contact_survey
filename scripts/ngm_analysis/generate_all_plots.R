@@ -227,19 +227,27 @@ generate_univariable_plots <- function() {
                 ref_val <- res$reference_group_strata[[config$var]]
                 plot_data[, is_reference := get(config$var) == ref_val]
 
-                var_levels <- unique(plot_data[[config$var]])
-                color_palette <- get_demographic_palette(config$var, var_levels)
+                # Use the same shared colour scheme as create_demographic_plot
+                fill_label <- if (config$var == "SES") "NS-SeC" else tools::toTitleCase(config$var)
+                set2 <- RColorBrewer::brewer.pal(8, "Set2")
+                shared_values <- c(
+                    "Age"                     = set2[1],
+                    "Ethnicity"               = set2[2],
+                    "NS-SeC"                  = set2[3],
+                    "Gender"                  = set2[4],
+                    "NS-SeC \u00d7 Ethnicity" = set2[5]
+                )
 
                 p <- ggplot(plot_data, aes(x = .data[[config$var]], y = RelativeBurden_mean)) +
                     geom_pointrange(
                         data = plot_data[is_reference == FALSE],
                         aes(
                             ymin = RelativeBurden_lowerCI, ymax = RelativeBurden_upperCI,
-                            color = .data[[config$var]]
+                            color = fill_label
                         ),
-                        size = 0.8, show.legend = FALSE
+                        size = 0.8
                     ) +
-                    scale_color_manual(values = color_palette) +
+                    scale_color_manual(values = shared_values, name = NULL) +
                     geom_pointrange(
                         data = plot_data[is_reference == TRUE],
                         aes(ymin = RelativeBurden_lowerCI, ymax = RelativeBurden_upperCI),
@@ -250,7 +258,8 @@ generate_univariable_plots <- function() {
                         title = config$title,
                         subtitle = format_reference_group(res$reference_group_strata),
                         x = NULL,
-                        y = if (config$title == "A) By Age") "Relative Risk of Infection (vs Reference)" else NULL
+                        y = if (config$title == "A) By Age") "Relative Risk of Infection (vs Reference)" else NULL,
+                        colour = NULL
                     ) +
                     get_common_theme() +
                     scale_y_log10(labels = number_format(accuracy = 0.1))
