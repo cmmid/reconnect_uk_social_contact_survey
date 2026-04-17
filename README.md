@@ -1,4 +1,4 @@
-# Post-pandemic social contact patterns in the United Kingdom: the Reconnect survey
+# Social contact patterns in the United Kingdom following the COVID-19 pandemic: the Reconnect cross-sectional survey
 
 Lucy Goodfellow¹ *†, Billy J. Quilty¹'², Kevin van Zandvoort¹‡, W. John Edmunds¹‡
 
