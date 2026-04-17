@@ -1,6 +1,6 @@
 # Social contact patterns in the United Kingdom following the COVID-19 pandemic: the Reconnect cross-sectional survey
 
-Lucy Goodfellow¹ *†, Billy J. Quilty¹'², Kevin van Zandvoort¹‡, W. John Edmunds¹‡
+Lucy Goodfellow¹ *†, Billy J. Quilty¹'²†, Kevin van Zandvoort¹‡, W. John Edmunds¹‡
 
 † equal contribution  
 ‡ equal contribution  
