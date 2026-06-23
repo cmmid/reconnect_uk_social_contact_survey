@@ -455,7 +455,7 @@ process_participants <- function(data,
     mutate_at(vars(contains("_age")), as.character) %>%
     mutate_at(vars(contains("_age")), as.numeric) %>% 
     pivot_longer(!c(id,p_age,additional_contacts)) %>% 
-    drop_na() %>% group_by(id, additional_contacts) %>% count() %>% ungroup() %>% 
+    filter(!is.na(value)) %>% group_by(id, additional_contacts) %>% count() %>% ungroup() %>% 
     mutate(additional_contacts = as.character(additional_contacts)) %>% 
     complete(id = data$id, fill = list(additional_contacts = 'I did not have any contacts', n = 0)) %>% 
     rename(p_id = id)
@@ -715,7 +715,8 @@ process_participants <- function(data,
     mutate(large_n = case_when(eq ~ 0, T ~ large_n),
            add_u18_other = case_when(eq ~ 0, T ~ add_u18_other),
            add_18_64_other = case_when(eq ~ 0, T ~ add_18_64_other),
-           add_65_other = case_when(eq ~ 0, T ~ add_65_other))
+           add_65_other = case_when(eq ~ 0, T ~ add_65_other)) %>% 
+    select(!n)
 
   data
 }
