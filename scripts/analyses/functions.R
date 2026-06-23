@@ -715,8 +715,7 @@ process_participants <- function(data,
     mutate(large_n = case_when(eq ~ 0, T ~ large_n),
            add_u18_other = case_when(eq ~ 0, T ~ add_u18_other),
            add_18_64_other = case_when(eq ~ 0, T ~ add_18_64_other),
-           add_65_other = case_when(eq ~ 0, T ~ add_65_other)) %>% 
-    select(!n)
+           add_65_other = case_when(eq ~ 0, T ~ add_65_other))
 
   data
 }
