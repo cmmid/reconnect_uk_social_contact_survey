@@ -331,7 +331,7 @@ fcn_impute <- function(
 
 ## dataset imputation function ##
 
-fcn_impute_raw_counts <- function(
+fcn_impute_raw_counts_OLD <- function(
     data_input, # dataset which needs filling in, e.g. raw_counts
     var, # name of variable which is being imputed (c_ethnicity or c_sec_input)
     dependent_vars = NULL # names of columns to create a dependent distribution 
@@ -441,7 +441,105 @@ fcn_impute_raw_counts <- function(
   
 }
 
-
+fcn_impute_raw_counts <- function(
+    data_input,
+    var,
+    dependent_vars = NULL
+){
+  
+  data_in <- data.table::copy(data.table::as.data.table(data_input))
+  
+  generalised_var <- gsub("^p_", "", gsub("^c_", "", var))
+  if(generalised_var %notin% c('ethnicity', 'sec_input')){stop('Not set up for this var')}
+  
+  key_col <- if(generalised_var == 'ethnicity') 'cag_Prefer not to say' else 'cag_Unknown'
+  
+  if(sum(data_in[[key_col]]) == 0){
+    cat('0 changes made')
+    return(data_in)
+  }
+  
+  n_changes <- sum(data_in[[key_col]])
+  rows_to_change <- data_in[get(key_col) > 0, row_id]
+  
+  # distribution of the variable in the non-missing data
+  distribution_var_vec <- c(dependent_vars, colnames(data_in)[grepl('cag', colnames(data_in))])
+  distribution_var_vec <- setdiff(distribution_var_vec, key_col)
+  
+  data_distr <- data_in[, ..distribution_var_vec][, lapply(.SD, mean), by = dependent_vars]
+  value_cols <- setdiff(colnames(data_distr), dependent_vars)
+  data_distr[, tot := rowSums(.SD), .SDcols = value_cols]
+  data_distr_l <- data.table::melt.data.table(data_distr, id.vars = c(dependent_vars, 'tot'))
+  data_distr_l[, prop := value / tot]
+  
+  vars_to_replace <- unique(as.character(data_distr_l$variable))
+  col_nums  <- match(vars_to_replace, colnames(data_in))   # precomputed once
+  key_col_num <- which(colnames(data_in) == key_col)
+  
+  # helper: draw a (length(vars_to_replace) x length(rows)) matrix of multinomial
+  # counts in one shot, given a fixed prob vector and per-row totals
+  draw_samples <- function(rows, probs){
+    probs[is.na(probs)] <- 0
+    n_vec <- data_in[[key_col_num]][rows]
+    vapply(
+      n_vec,
+      function(n) as.integer(stats::rmultinom(1, n, probs)),
+      integer(length(vars_to_replace))
+    )
+  }
+  
+  apply_samples <- function(rows, samp_mat){
+    for(j in seq_along(vars_to_replace)){
+      data.table::set(
+        data_in, i = rows, j = col_nums[j],
+        value = data_in[[col_nums[j]]][rows] + samp_mat[j, ]
+      )
+    }
+    data.table::set(data_in, i = rows, j = key_col_num, value = 0L)
+  }
+  
+  if(length(dependent_vars) == 0){
+    
+    probs <- data_distr_l$prop
+    names(probs) <- as.character(data_distr_l$variable)
+    probs <- probs[vars_to_replace]
+    
+    samp_mat <- draw_samples(rows_to_change, probs)
+    apply_samples(rows_to_change, samp_mat)
+    
+  }else{
+    
+    # group rows needing imputation by their dependent-variable combination,
+    # so the lookup/filter of data_distr_l happens once per group, not once per row
+    dep_dt <- data_in[rows_to_change, c('row_id', dependent_vars), with = FALSE]
+    dep_dt[, .grp := .GRP, by = dependent_vars]
+    
+    for(g in unique(dep_dt$.grp)){
+      
+      sub_rows <- dep_dt[.grp == g, row_id]
+      dep_vals <- dep_dt[.grp == g][1]
+      
+      filt <- data_distr_l
+      for(dep_var in dependent_vars){
+        filt <- filt[get(dep_var) == dep_vals[[dep_var]]]
+      }
+      
+      probs <- filt$prop
+      names(probs) <- as.character(filt$variable)
+      probs <- probs[vars_to_replace]
+      
+      samp_mat <- draw_samples(sub_rows, probs)
+      apply_samples(sub_rows, samp_mat)
+    }
+  }
+  
+  if(sum(data_in[[key_col]]) > 0){
+    warning(paste0("Still some observations left in ", key_col))
+  }
+  
+  # cat(length(rows_to_change), ' changes made to ', var, ' (', n_changes, ' total changes)\n', sep = '')
+  return(data_in)
+}
 
 #### CLEAN DATA ####
 
@@ -642,6 +740,27 @@ process_participants <- function(data,
 
     data <- data %>%
       mutate(
+        add_u18_school = case_when(
+          p_id %in% teachers_id &
+            add_u18_school == add_u18_work ~ add_u18_school,
+          p_id %in% teachers_id &
+            add_u18_school != add_u18_work ~ add_u18_school + add_u18_work,
+          T ~ add_u18_school
+        ),
+        add_18_64_school = case_when(
+          p_id %in% teachers_id &
+            add_18_64_school == add_18_64_work ~ add_18_64_school,
+          p_id %in% teachers_id &
+            add_18_64_school != add_18_64_work ~ add_18_64_school + add_18_64_work,
+          T ~ add_18_64_school
+        ),
+        add_65_school = case_when(
+          p_id %in% teachers_id &
+            add_65_school == add_65_work ~ add_65_school,
+          p_id %in% teachers_id &
+            add_65_school != add_65_work ~ add_65_school + add_65_work,
+          T ~ add_65_school
+        ),
         add_u18_work = case_when(
           p_id %in% teachers_id ~ 0,
           T ~ add_u18_work
@@ -653,18 +772,6 @@ process_participants <- function(data,
         add_65_work = case_when(
           p_id %in% teachers_id ~ 0,
           T ~ add_65_work
-        ),
-        add_u18_school = case_when(
-          p_id %in% teachers_id ~ add_u18_school + add_u18_work,
-          T ~ add_u18_school
-        ),
-        add_18_64_school = case_when(
-          p_id %in% teachers_id ~ add_18_64_school + add_18_64_work,
-          T ~ add_18_64_school
-        ),
-        add_65_school = case_when(
-          p_id %in% teachers_id ~ add_65_school + add_65_work,
-          T ~ add_65_school
         )
       )
 
@@ -843,11 +950,10 @@ household_processing <- function(data) {
       names_to = "name", values_to = "value",
       values_transform = list(value = as.character)
     ) %>%
-    na.omit() %>%
     mutate(household_member = as.numeric(gsub("\\D", "", name)), information = gsub("m|_|[0-9]+", "", name)) %>%
     select(p_id, household_member, information, value) %>%
     pivot_wider(names_from = information, values_from = value) %>%
-    filter(!is.na(age)) %>%
+    filter(! (is.na(age) & is.na(sex))) %>% 
     group_by(p_id) %>%
     mutate(n_household_members = n()) %>%
     ungroup()
